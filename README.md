@@ -1,39 +1,13 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
 ## Description
 
-Clonepilot - A NestJS application that integrates with Microsoft Copilot Studio using delegated user authentication.
+This project is used as a playground for the @microsoft/agents-copilotstudio-client sdk. To properly use this repository you will need to have the prerequisites given by their package. I will also give some other details I found during the creation of this setup. 
 
-## Installation
-
-```bash
-$ npm install
-```
+## Extra Prerequisites 
+Using the SDK I found the following information helpful:
+1. If you use delegated permissions make sure your redirectURI is added to your service principle
+2. If you want to use Confidential client with Service principle token, you will need to request microsoft to enable S2S. The exact error you will get if you havent done this is: ThirdPartyAuthenticatedPublishedBotController.EnableS2SAuthFeature not enabled. See [community question](https://community.powerplatform.com/forums/thread/details/?threadid=1410e204-94b4-f011-bbd3-00224826fe9a).
 
 ## Configuration
-
 Create a `.env` file with the following variables:
 
 ```env
@@ -51,25 +25,26 @@ SCHEMA_NAME=your-schema-name
 ```
 
 ### Azure AD App Registration Setup
-
 1. Go to Azure Portal > Azure Active Directory > App registrations
 2. Create a new registration or use an existing one
 3. Under "Authentication", add a redirect URI: `http://localhost:3000/auth/callback`
+4. Also, under settings enable public client flows (only for delegated permissions)
 4. Under "API permissions", add the required Copilot Studio / Power Platform permissions
-5. Make sure to grant admin consent if required
+  - If you want to use the users token use *delegated*
+  - If you want to use a confidential client use *application*
+6. Make sure to grant admin consent if required (only for application)
 
-## Running the app
+## Running it locally
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+$ npm install
 ```
+
+```bash
+$ npm start dev
+```
+
+The application will force you to login after which you can use postman to call the */message* endpoint.
 
 ## API Endpoints
 
@@ -86,58 +61,11 @@ $ npm run start:prod
 
 | Endpoint | Method | Body | Description |
 |----------|--------|------|-------------|
-| `/start` | POST | - | Start a new conversation with Copilot |
-| `/message` | POST | `{ "text": "...", "conversationId": "..." }` | Send a message to an existing conversation |
+| `/message` | POST | `{ "text": "...", "contactId": "..." }` | Send a message to an existing conversation or create a new one if one doesnt exist with the contactId provided |
 
 ## Usage Flow
 
-1. **Login**: Navigate to `http://localhost:3000/auth/login` in your browser
-2. **Authenticate**: Sign in with your Microsoft account
-3. **Use API**: After successful login, you can use the `/start` and `/message` endpoints
-4. **Check Status**: Use `/auth/status` to verify your authentication status
-5. **Logout**: Use `/auth/logout` to clear your session
-
-## Example Usage
-
-```bash
-# Check auth status
-curl http://localhost:3000/auth/status
-
-# Start a conversation (requires authentication via browser first)
-curl -X POST http://localhost:3000/start \
-  -H "Content-Type: application/json" \
-  --cookie "connect.sid=your-session-cookie"
-
-# Send a message
-curl -X POST http://localhost:3000/message \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hello!", "conversationId": "conv-id-from-start"}' \
-  --cookie "connect.sid=your-session-cookie"
-```
-
-## Test
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).
+1. **configure**: Do the configuration first
+2. **Run application**: Call `npm run start`
+3. **Authenticate**: Use an ms account to authenticate
+4. **have a conversation**: Use `/message` to start the conversations and send messages
