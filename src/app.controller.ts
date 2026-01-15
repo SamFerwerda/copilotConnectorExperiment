@@ -1,16 +1,9 @@
-import { Controller, Get, Post, Body, Res } from '@nestjs/common';
-import { Response } from 'express';
-import { AppService } from './app.service';
+import { Controller, Get } from '@nestjs/common';
 import { TokenStoreService } from './auth/token-store.service';
-import {DBService} from './db/db.service';
 
 @Controller()
 export class AppController {
-  constructor(
-    private readonly appService: AppService,
-    private readonly tokenStore: TokenStoreService,
-    private readonly dbService: DBService,
-  ) {}
+  constructor(private readonly tokenStore: TokenStoreService) {}
 
   @Get('/')
   getInfo() {
@@ -21,22 +14,25 @@ export class AppController {
       message: 'Clonepilot API',
       authenticated: hasValidToken,
       tokenExpiresOn: token?.expiresOn?.toISOString() || null,
-      endpoints: {
+      approaches: {
+        delegatedSdk: {
+          description: 'Uses Copilot Studio SDK with delegated user credentials',
+          baseUrl: '/delegated',
+          requiresAuth: true,
+        },
+        directLine: {
+          description: 'Uses Direct Line REST API for bot communication',
+          baseUrl: '/directline',
+          requiresAuth: false,
+          requiresSecret: 'DIRECTLINE_SECRET in .env',
+        },
+      },
+      authEndpoints: {
         login: 'GET /auth/login',
         logout: 'GET /auth/logout',
         status: 'GET /auth/status',
-        startConversation: 'POST /start',
-        sendMessage: 'POST /message',
       },
-      setup: hasValidToken ? null : 'Visit /auth/login to authenticate',
+      setup: hasValidToken ? null : 'Visit /auth/login to authenticate (required for delegated SDK approach)',
     };
-  }
-
-  @Post('/message')
-  async sendMessage(@Body() body): Promise<any> {
-    const { text, contactId } = body;
-    const copilotId = this.dbService.get(contactId);
-    const responses = copilotId ? await this.appService.sendMessage(text, copilotId) : await this.appService.startConversation(contactId);
-    return responses;
   }
 }

@@ -1,19 +1,19 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { CopilotStudioClient, PowerPlatformCloud, AgentType } from '@microsoft/agents-copilotstudio-client';
-import { TokenStoreService } from './auth/token-store.service';
+import { TokenStoreService } from '../auth/token-store.service';
 import { Activity, ActivityTypes } from '@microsoft/agents-activity';
-import { DBService } from './db/db.service';
+import { DBService } from '../db/db.service';
 
-// Copilot settings - can be moved to config
+// Copilot settings
 const getCopilotSettings = () => ({
-  environmentId: process.env.ENVIRONMENT_ID || "b6822ff0-b0a4-ebfb-8cbc-c69412a98b17",
-  schemaName: process.env.SCHEMA_NAME || "crdbe_agent",
+  environmentId: process.env.ENVIRONMENT_ID || "",
+  schemaName: process.env.SCHEMA_NAME || "",
   cloud: PowerPlatformCloud.Prod,
   copilotAgentType: AgentType.Published,
 });
 
 @Injectable()
-export class AppService {
+export class DelegatedSdkService {
   constructor(private readonly tokenStore: TokenStoreService, private dbService: DBService) {}
   /**
    * Get the user token from the token store, this is temprarily stored in memory. In the future would like to do S2S authentication but this
@@ -66,7 +66,7 @@ export class AppService {
   }
 
   /**
-   * Start a new conversation
+   * Start a new conversation, this also initiates a new conversation id and saves it in a fake DB
    */
   async startConversation(contactId: string) {
     const copilotClient = this.getCopilotClient();
@@ -78,7 +78,7 @@ export class AppService {
       }
       const conversationId = responses.find(activity => !!activity.conversation?.id)?.conversation?.id;
       this.dbService.set(contactId, conversationId);
-      return { message: "Conversation started", responses};
+      return responses;
      } catch (error) {
       console.error("Error starting conversation:", error);
       throw error;

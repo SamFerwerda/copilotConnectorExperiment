@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { DBService } from './db/db.service';
+import { DelegatedSdkModule } from './delegated-sdk/delegated-sdk.module';
+import { DirectLineModule } from './directline/directline.module';
 
 @Module({
   imports: [
@@ -12,8 +12,10 @@ import { DBService } from './db/db.service';
       envFilePath: '.env',
     }),
     AuthModule,
+    DelegatedSdkModule,
+    DirectLineModule,
   ],
   controllers: [AppController],
-  providers: [AppService, DBService],
+  providers: [],
 })
 export class AppModule {}
