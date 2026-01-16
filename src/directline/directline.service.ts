@@ -1,5 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { DBService } from '../db/db.service';
+import { Activity } from '@microsoft/agents-activity';
 
 interface DirectLineToken {
   token: string;
@@ -39,7 +40,7 @@ export class DirectLineService {
   /**
    * Start a new conversation through Direct Line API
    */
-  async startConversation(contactId: string): Promise<DirectLineActivity[]> {
+  async startConversation(contactId: string) {
     if (!this.directLineSecret) {
       throw new HttpException(
         'Direct Line secret not configured. Add DIRECTLINE_SECRET to .env',
@@ -76,18 +77,7 @@ export class DirectLineService {
       // Also store in DB for persistence
       this.dbService.set(`directline:${contactId}`, data.conversationId);
 
-      console.log(`Direct Line conversation started: ${data.conversationId}`);
-
-      // Poll for the bot's welcome messages
-      const { activities, watermark } = await this.pollForActivities(data.token, data.conversationId, contactId);
-      
-      // Update the stored watermark
-      const storedToken = this.conversationTokens.get(contactId);
-      if (storedToken) {
-        storedToken.watermark = watermark;
-      }
-
-      return activities;
+      return true;
     } catch (error) {
       if (error instanceof HttpException) throw error;
       console.error('Error starting Direct Line conversation:', error);
@@ -101,7 +91,31 @@ export class DirectLineService {
   /**
    * Send a message and poll for responses until all activities are received
    */
-  async sendMessage(text: string, contactId: string): Promise<DirectLineActivity[]> {
+  async sendActivityAndWaitForReply(activity: Partial<Activity>, contactId: string): Promise<DirectLineActivity[]> {
+    try {
+        console.log('Sending activity:', activity);
+        const tokenInfo = this.conversationTokens.get(contactId);
+        // Send the message
+        await this.sendActivity(activity, contactId);
+
+        // Poll for responses using the stored watermark
+        const { activities, watermark } = await this.pollForActivities(tokenInfo.token, tokenInfo.conversationId, contactId);
+        
+        // Update the stored watermark for next time
+        tokenInfo.watermark = watermark;
+        
+        return activities;
+    } catch (error) {
+        if (error instanceof HttpException) throw error;
+        console.error('Error sending message:', error);
+        throw new HttpException(
+            'Failed to send message',
+            HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+    }
+  }
+
+  private async sendActivity(activity: Partial<Activity>, contactId: string): Promise<void> {
     const tokenInfo = this.conversationTokens.get(contactId);
     
     if (!tokenInfo) {
@@ -113,48 +127,23 @@ export class DirectLineService {
 
     const { token, conversationId } = tokenInfo;
 
-    try {
-      // Send the message
-      const sendResponse = await fetch(
-        `${this.directLineEndpoint}/conversations/${conversationId}/activities`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            type: 'message',
-            from: { id: 'user' },
-            text: text,
-          }),
+    const response = await fetch(
+      `${this.directLineEndpoint}/conversations/${conversationId}/activities`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify(activity),
+      },
+    );
 
-      if (!sendResponse.ok) {
-        const error = await sendResponse.text();
-        throw new HttpException(
-          `Failed to send message: ${error}`,
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
-
-      const sendResult = await sendResponse.json();
-      console.log(`Message sent with ID: ${sendResult.id}`);
-
-      // Poll for responses using the stored watermark
-      const { activities, watermark } = await this.pollForActivities(token, conversationId, contactId);
-      
-      // Update the stored watermark for next time
-      tokenInfo.watermark = watermark;
-      
-      return activities;
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      console.error('Error sending message:', error);
+    if (!response.ok) {
+      const error = await response.text();
       throw new HttpException(
-        'Failed to send message',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        `Failed to send activity: ${error}`,
+        HttpStatus.BAD_GATEWAY,
       );
     }
   }
