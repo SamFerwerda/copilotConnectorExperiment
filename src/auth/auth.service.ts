@@ -34,8 +34,8 @@ export class AuthService {
 
     // Get the scope for Copilot Studio
     const settings = {
-      environmentId: process.env.ENVIRONMENT_ID || "b6822ff0-b0a4-ebfb-8cbc-c69412a98b17",
-      schemaName: process.env.SCHEMA_NAME || "crdbe_agent",
+      environmentId: process.env.ENVIRONMENT_ID || "",
+      schemaName: process.env.SCHEMA_NAME || "",
       cloud: PowerPlatformCloud.Prod,
       copilotAgentType: AgentType.Published,
     };

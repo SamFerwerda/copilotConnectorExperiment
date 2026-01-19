@@ -149,28 +149,27 @@ export class DirectLineService {
   }
 
   /**
-   * Poll the activities endpoint until all bot responses are received
+   * Poll the activities endpoint until:
+   * 1. An activity returns with channelData.askForCustomerInput = true
+   * 2. Or 7 seconds timeout without receiving such an activity
    * Uses watermark from session to only get new activities
    */
   private async pollForActivities(
     token: string,
     conversationId: string,
     contactId: string,
-    maxAttempts: number = 20,
+    timeoutMs: number = 7000,
     pollIntervalMs: number = 300,
   ): Promise<{ activities: DirectLineActivity[]; watermark: string }> {
     // Get the stored watermark from session
     const tokenInfo = this.conversationTokens.get(contactId);
     let watermark: string | undefined = tokenInfo?.watermark;
     
-    let attempts = 0;
     const collectedActivities: DirectLineActivity[] = [];
-    let botResponded = false;
-    let consecutiveEmptyPolls = 0;
+    const startTime = Date.now();
+    let foundAskForCustomerInput = false;
 
-    while (attempts < maxAttempts) {
-      attempts++;
-
+    while (Date.now() - startTime < timeoutMs) {
       const url = watermark
         ? `${this.directLineEndpoint}/conversations/${conversationId}/activities?watermark=${watermark}`
         : `${this.directLineEndpoint}/conversations/${conversationId}/activities`;
@@ -190,8 +189,6 @@ export class DirectLineService {
       watermark = data.watermark;
 
       if (data.activities && data.activities.length > 0) {
-        consecutiveEmptyPolls = 0;
-        
         for (const activity of data.activities) {
           // Skip activities we've already collected
           if (collectedActivities.some(a => a.id === activity.id)) {
@@ -204,29 +201,17 @@ export class DirectLineService {
           }
 
           collectedActivities.push(activity);
-          botResponded = true;
-        }
 
-        // If the bot has responded and we see an end of conversation or typing stopped,
-        // we can consider the response complete
-        const lastActivity = data.activities[data.activities.length - 1];
-        if (botResponded && 
-            lastActivity.from?.id !== 'user' && 
-            lastActivity.type === 'message') {
-          // Wait a bit more to see if there are additional messages
-          await this.delay(pollIntervalMs);
-          consecutiveEmptyPolls++;
-          
-          if (consecutiveEmptyPolls >= 2) {
-            // No more activities coming, we're done
+          // Check if this activity has askForCustomerInput = true
+          if (activity.channelData?.askForCustomerInput === true || activity.name === "askForCustomerInput") {
+            foundAskForCustomerInput = true;
+            console.log('Found activity with askForCustomerInput = true, stopping poll');
             break;
           }
         }
-      } else {
-        consecutiveEmptyPolls++;
-        
-        // If we've received bot responses and had 3 empty polls, we're done
-        if (botResponded && consecutiveEmptyPolls >= 3) {
+
+        // If we found the askForCustomerInput flag, stop polling
+        if (foundAskForCustomerInput) {
           break;
         }
       }
@@ -234,7 +219,8 @@ export class DirectLineService {
       await this.delay(pollIntervalMs);
     }
 
-    console.log(`Collected ${collectedActivities.length} activities after ${attempts} poll attempts`);
+    const elapsedMs = Date.now() - startTime;
+    console.log(`Collected ${collectedActivities.length} activities after ${elapsedMs}ms (askForCustomerInput: ${foundAskForCustomerInput})`);
     return { activities: collectedActivities, watermark: watermark || '' };
   }
 

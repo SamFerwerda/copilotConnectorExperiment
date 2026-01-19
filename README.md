@@ -2,9 +2,10 @@
 
 This project is used as a playground for the @microsoft/agents-copilotstudio-client sdk. To properly use this repository you will need to have the prerequisites given by their package. I will also give some other details I found during the creation of this setup.
 
-This project includes two approaches for connecting to Copilot Studio:
+This project includes three approaches for connecting to Copilot Studio:
 1. **Delegated SDK** - Uses the Copilot Studio SDK with delegated user credentials (OAuth)
-2. **Direct Line API** - Uses the Direct Line REST API (no user authentication required)
+2. **Application SDK** - Uses the Copilot Studio SDK with application/SPN credentials (S2S)
+3. **Direct Line API** - Uses the Direct Line REST API (no user authentication required)
 
 ## Extra Prerequisites 
 Using the SDK I found the following information helpful:
@@ -43,6 +44,14 @@ DIRECTLINE_ENDPOINT=https://europe.directline.botframework.com/v3/directline
   - If you want to use a confidential client use *application*
 6. Make sure to grant admin consent if required (only for application)
 
+### Azure AD App Registration Setup (for Application SDK / S2S)
+1. Go to Azure Portal > Azure Active Directory > App registrations
+2. Create a new registration or use an existing one
+3. Under "Certificates & secrets", create a new client secret
+4. Under "API permissions", add Copilot Studio / Power Platform **application** permissions
+5. Grant admin consent for the permissions
+6. **Important**: Request Microsoft to enable S2S for your environment. Without this, you'll get the error: `ThirdPartyAuthenticatedPublishedBotController.EnableS2SAuthFeature not enabled`
+
 ### Direct Line Setup
 1. Go to Copilot Studio > Your Bot > Settings > Channels
 2. Select "Mobile app" or configure Direct Line
@@ -80,6 +89,15 @@ The application will force you to login (for delegated SDK) after which you can 
 | `/delegated/` | GET | - | Get info about the delegated SDK approach |
 | `/delegated/message` | POST | `{ "text": "...", "contactId": "..." }` | Send a message (creates conversation if needed) |
 
+### Application SDK Endpoints (S2S - No User Authentication)
+
+| Endpoint | Method | Body | Description |
+|----------|--------|------|-------------|
+| `/application/` | GET | - | Get info about the application SDK approach |
+| `/application/message` | POST | `{ "text": "...", "contactId": "..." }` | Send a message (creates conversation if needed) |
+
+> **Note**: Application SDK requires S2S to be enabled by Microsoft for your environment.
+
 ### Direct Line API Endpoints (No Authentication Required)
 
 | Endpoint | Method | Body | Description |
@@ -114,6 +132,20 @@ The application will force you to login (for delegated SDK) after which you can 
      -d '{"text": "Hello!", "contactId": "user123"}'
    ```
 
+### Option 3: Application SDK (S2S with SPN credentials)
+
+> **Important**: This approach requires Microsoft to enable S2S for your environment. Without it, you'll get the error: `ThirdPartyAuthenticatedPublishedBotController.EnableS2SAuthFeature not enabled`
+
+1. **Configure**: Add Azure AD credentials to `.env` (same as delegated, but with application permissions)
+2. **Request S2S**: Contact Microsoft to enable S2S for your Copilot Studio environment
+3. **Run application**: `npm run start`
+4. **Send messages** (no browser login required):
+   ```bash
+   curl -X POST http://localhost:3000/application/message \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello!", "contactId": "user123"}'
+   ```
+
 ## Testing with Postman
 
 ### Direct Line API
@@ -136,4 +168,12 @@ The application will force you to login (for delegated SDK) after which you can 
 2. Then use Postman:
    - Method: `POST`
    - URL: `http://localhost:3000/delegated/message`
+   - Body (JSON): `{ "text": "Hello!", "contactId": "test-user-1" }`
+
+### Application SDK (S2S)
+
+1. Make sure S2S is enabled for your environment
+2. Use Postman directly (no browser login required):
+   - Method: `POST`
+   - URL: `http://localhost:3000/application/message`
    - Body (JSON): `{ "text": "Hello!", "contactId": "test-user-1" }`

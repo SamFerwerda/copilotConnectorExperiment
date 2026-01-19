@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { DelegatedSdkModule } from './delegated-sdk/delegated-sdk.module';
 import { DirectLineModule } from './directline/directline.module';
+import { ApplicationSdkModule } from './application-sdk/application-sdk.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { DirectLineModule } from './directline/directline.module';
     AuthModule,
     DelegatedSdkModule,
     DirectLineModule,
+    ApplicationSdkModule,
   ],
   controllers: [AppController],
   providers: [],
