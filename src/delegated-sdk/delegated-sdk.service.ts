@@ -4,6 +4,10 @@ import { TokenStoreService } from '../auth/token-store.service';
 import { Activity, ActivityTypes } from '@microsoft/agents-activity';
 import { DBService } from '../db/db.service';
 
+
+// delay for ms 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Copilot settings
 const getCopilotSettings = () => ({
   environmentId: process.env.ENVIRONMENT_ID || "",
@@ -11,6 +15,8 @@ const getCopilotSettings = () => ({
   cloud: PowerPlatformCloud.Prod,
   copilotAgentType: AgentType.Published,
 });
+
+let client: CopilotStudioClient | null = null;
 
 @Injectable()
 export class DelegatedSdkService {
@@ -39,12 +45,16 @@ export class DelegatedSdkService {
   }
 
   /**
-   * Get a Copilot client using the user's delegated token
+   * Get a Copilot client
    */
   private getCopilotClient(): CopilotStudioClient {
+    if (client) {
+      return client;
+    }
     const settings = getCopilotSettings();
     const userToken = this.getUserToken();
-    return new CopilotStudioClient(settings, userToken);
+    client = new CopilotStudioClient(settings, userToken);
+    return client;
   }
 
   /**
@@ -68,15 +78,30 @@ export class DelegatedSdkService {
   /**
    * Start a new conversation, this also initiates a new conversation id and saves it in a fake DB
    */
-  async startConversation(contactId: string) {
+  async startConversation(contactId: string, simulatedAsyncWorkInMs = 0): Promise<any> {
     const copilotClient = this.getCopilotClient();
     
     try {
       const responses = [];
-      for await (const response of copilotClient.startConversationStreaming(true)) {
+      const startConversationEvent = Activity.fromObject({ type: ActivityTypes.Event, value: {test: true, properties: {x: 1, y:true, z: "test string"}}, name: "startConversation" });
+      
+      // This setup will start a conversations but it will not provide you the conversation id (which we need to connect back to same conversation).
+      // Therefore to get the conversation id you either need to start conversation WITH event or send a message using the same 
+      // client after the start of the conversation.
+      for await (const response of copilotClient.startConversationStreaming(false)) {
+        responses.push(response);
+      }
+
+      // simulate some async work being done here
+      await delay(simulatedAsyncWorkInMs);
+
+      for await (const response of copilotClient.sendActivityStreaming(
+        startConversationEvent)){
         responses.push(response);
       }
       const conversationId = responses.find(activity => !!activity.conversation?.id)?.conversation?.id;
+      console.log(`Started contactId ${contactId} conversation with ID ${conversationId}`);
+      
       this.dbService.set(contactId, conversationId);
       return responses;
      } catch (error) {

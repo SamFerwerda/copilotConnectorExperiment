@@ -29,11 +29,11 @@ export class DelegatedSdkController {
 
   @Post('/message')
   async sendMessage(@Body() body): Promise<any> {
-    const { text, contactId } = body;
+    const { text, contactId, delay } = body;
     const copilotId = this.dbService.get(contactId);
     const responses = copilotId 
       ? await this.delegatedSdkService.sendMessage(text, copilotId) 
-      : await this.delegatedSdkService.startConversation(contactId);
+      : await this.delegatedSdkService.startConversation(contactId, delay);
     return responses;
   }
 }
